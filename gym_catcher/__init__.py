@@ -19,3 +19,9 @@ for reward_type in ['sparse', 'dense']:
         )}
     )
 
+    register(
+        id='UR5PickAndPlace{}-v0'.format(suffix),
+        entry_point='gym_catcher.envs:UR5PickAndPlaceEnv',
+        kwargs=kwargs,
+        max_episode_steps=50,
+    )

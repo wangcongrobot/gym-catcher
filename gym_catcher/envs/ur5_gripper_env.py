@@ -88,7 +88,9 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
     # ----------------------------
 
     # new reward compute function for catch env
-    def compute_reward(self, achieved_goal, goal, info):
+    def compute_reward_catch(self, achieved_goal, goal, info):
+        print("compute_reward")
+        print("self.action:",  self.action)
         reward_ctrl = - 0.05 * np.square(self.action).sum()
 
         dist_to_end_location = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') -
@@ -115,6 +117,15 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         info = dict(scoring_reward=sparse_reward)
 
         return reward, False, info
+
+    # fetch
+    def compute_reward(self, achieved_goal, goal, info):
+        # Compute distance between goal and the achieved goal.
+        d = goal_distance(achieved_goal, goal)
+        if self.reward_type == 'sparse':
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            return -d
 
     # add new function for catch env
     # random initial position and velocity for the target ball
@@ -156,31 +167,33 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         if self.block_gripper:
             # self.sim.data.set_joint_qpos('robot0:l_gripper_finger_joint', 0.)
             # self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
-            # self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
-            # self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
-            # self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
             self.sim.forward()
 
-    def _set_action1(self, action):
+    def _set_action(self, action):
         assert action.shape == (self.n_actions,)
         action = action.copy()  # ensure that we don't change the action outside of this scope
-        pos_ctrl, gripper_ctrl = action[:3], action[3]
+        pos_ctrl, gripper_ctrl = action[:3], action[3:]
 
-        pos_ctrl *= 0.05  # limit maximum change in position
-        rot_ctrl = [1., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
-        gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
-        assert gripper_ctrl.shape == (2,)
+        # pos_ctrl *= 0.05  # limit maximum change in position
+        rot_ctrl = [0., 0., -1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
+        # gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
+        print("pos_ctrl:", pos_ctrl)
+        # print("rot_ctrl:", rot_ctrl)
+        print("gripper_ctrl:", gripper_ctrl)
+        # assert gripper_ctrl.shape == (4,)
         if self.block_gripper:
             gripper_ctrl = np.zeros_like(gripper_ctrl)
+            print("block_gripper")
         action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
+        # action = np.concatenate([pos_ctrl, gripper_ctrl])
         print("action:", action)
 
         # Apply action to simulation.
-        # utils.ctrl_set_action(self.sim, action)
-        # utils.mocap_set_action(self.sim, action)
+        utils.ctrl_set_action(self.sim, action)
+        utils.mocap_set_action(self.sim, action)
 
     # change function for catch env
-    def _set_action(self, action):
+    def _set_action_catch(self, action):
         assert action.shape == (self.n_actions,) # 7
 
         self.action = action
@@ -257,13 +270,13 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         # print("robot_qvel:", robot_qvel)
         if self.has_object:
             # object_pos - Position of the object with respect to the world frame
-            object_pos = self.sim.data.get_site_xpos('object0') 
+            object_pos = self.sim.data.get_site_xpos('tar') 
             # rotations object_rot - Yes. That is the orientation of the object with respect to world frame.
-            object_rot = rotations.mat2euler(self.sim.data.get_site_xmat('object0'))
+            object_rot = rotations.mat2euler(self.sim.data.get_site_xmat('tar'))
             # velocities object_velp - Positional velocity of the object with respect to the world frame
-            object_velp = self.sim.data.get_site_xvelp('object0') * dt
+            object_velp = self.sim.data.get_site_xvelp('tar') * dt
             # object_velr - Rotational velocity of the object with respect to the world frame
-            object_velr = self.sim.data.get_site_xvelr('object0') * dt
+            object_velr = self.sim.data.get_site_xvelr('tar') * dt
             # gripper state
             # object_rel_pos - Position of the object relative to the gripper
             object_rel_pos = object_pos - grip_pos
@@ -320,14 +333,19 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         # Randomize start position of object.
         self._restart_target()
 
-        if self.has_object:
-            object_xpos = self.initial_gripper_xpos[:2]
-            while np.linalg.norm(object_xpos - self.initial_gripper_xpos[:2]) < 0.1:
-                object_xpos = self.initial_gripper_xpos[:2] + self.np_random.uniform(-self.obj_range, self.obj_range, size=2)
-            object_qpos = self.sim.data.get_joint_qpos('object0:joint')
-            assert object_qpos.shape == (7,)
-            object_qpos[:2] = object_xpos
-            self.sim.data.set_joint_qpos('object0:joint', object_qpos)
+        # if self.has_object:
+        #     object_xpos = self.initial_gripper_xpos[:2]
+        #     while np.linalg.norm(object_xpos - self.initial_gripper_xpos[:2]) < 0.1:
+        #         object_xpos = self.initial_gripper_xpos[:2] + self.np_random.uniform(-self.obj_range, self.obj_range, size=2)
+        #     object_qpos = self.sim.data.get_joint_qpos('object0:joint')
+        #     object_xpos1 = self.sim.data.get_body_xpos('tar')
+        #     object_xquat1 = self.sim.data.get_body_xquat('tar')
+        #     object_qpos = np.concatenate([object_xpos1, object_xquat1])
+        #     print("object_qpos:", object_qpos)
+        #     print("object_xpos:", object_xpos)
+        #     assert object_qpos.shape == (7,)
+        #     object_qpos[:2] = object_xpos
+        #     self.sim.data.set_joint_qpos('tar', object_qpos)
 
         self.sim.forward()
         return True

@@ -127,7 +127,7 @@ class RobotEnvM(gym.GoalEnv):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def step(self, action):
+    def step_m(self, action):
         action = np.clip(action, self.action_space.low, self.action_space.high)
         self._set_action(action)
         self.sim.step()
@@ -143,6 +143,25 @@ class RobotEnvM(gym.GoalEnv):
         #     'is_success': self._is_success(obs['achieved_goal'], self.goal),
         # }
         # reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
+        return obs, reward, done, info
+
+    def step(self, action):
+        print("step function --> action:", action)
+        action = np.clip(action, self.action_space.low, self.action_space.high)
+        print("step function --> action:", action)
+        self._set_action(action)
+        self.sim.step()
+        self._step_callback()
+        obs = self._get_obs()
+
+        done = False
+        info = {
+            'is_success': self._is_success(obs['achieved_goal'], self.goal),
+        }
+        print(obs['achieved_goal'])
+        print(self.goal)
+        print(info)
+        reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
         return obs, reward, done, info
 
     def reset(self):
