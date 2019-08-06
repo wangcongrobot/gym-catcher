@@ -1,0 +1,3 @@
+gym==0.14.0
+numpy
+mujoco_py==2.0.2.4

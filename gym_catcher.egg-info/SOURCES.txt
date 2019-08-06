@@ -1,0 +1,7 @@
+README.md
+setup.py
+gym_catcher.egg-info/PKG-INFO
+gym_catcher.egg-info/SOURCES.txt
+gym_catcher.egg-info/dependency_links.txt
+gym_catcher.egg-info/requires.txt
+gym_catcher.egg-info/top_level.txt
