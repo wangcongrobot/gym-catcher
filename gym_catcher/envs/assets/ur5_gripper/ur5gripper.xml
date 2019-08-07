@@ -120,10 +120,10 @@ Control Engineering / Automation Engineering
     <worldbody>
         <!-- the coordination of the end-effector: x, y, z and box -->
         <body mocap="true" name="robot0:mocap" pos="0 0 0">
-            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.7" size="0.005 0.005 0.005" type="box"></geom>
-            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="1 0 0 0.1" size="1 0.005 0.005" type="box"></geom>
-            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 1 0 0.1" size="0.005 1 0.001" type="box"></geom>
-            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0 1 0.1" size="0.005 0.005 1" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0.07 0" rgba="0 0.5 0 0.7" size="0.02 0.02 0.02" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0.07 0" rgba="1 0 0 0.1" size="1 0.005 0.005" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0.07 0" rgba="0 1 0 0.1" size="0.005 1 0.005" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0.07 0" rgba="0 0 1 0.1" size="0.005 0.005 1" type="box"></geom>
         </body>
         <!--Lighting parameters-->
         <light name="light3" mode="targetbody" target="box_link" directional="true" pos="1 1 3" />
@@ -306,7 +306,7 @@ Control Engineering / Automation Engineering
 		</body>
 		<body name="object0" pos="0.025 0.025 0.025">
 			<joint name="object0:joint" type="free" damping="0.01"></joint>
-			<geom size="0.05 0.05 0.05" type="sphere" condim="3" name="object0" material="block_mat" mass="1"></geom>
+			<geom size="0.05 0.05 0.05" type="sphere" condim="3" name="object0" material="block_mat" mass="0.1"></geom>
 			<site name="object0" pos="0 0 0" size="0.02 0.02 0.02" rgba="1 0 0 1" type="sphere"></site>
 		</body>
 
