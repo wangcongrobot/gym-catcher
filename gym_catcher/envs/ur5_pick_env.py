@@ -69,7 +69,7 @@ class UR5PickEnv(robot_env.RobotEnv):
             self.sim.forward()
 
     def _set_action(self, action):
-        print("_set_action:", action)
+        # print("_set_action:", action)
         assert action.shape == (7,)
         action = action.copy()  # ensure that we don't change the action outside of this scope
         pos_ctrl, gripper_ctrl = action[:3], action[3:]
@@ -203,8 +203,11 @@ class UR5PickEnv(robot_env.RobotEnv):
         self.sim.forward()
 
         # Move end effector into position.
-        gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) + self.sim.data.get_site_xpos('gripperpalm')
-        gripper_rotation = np.array([1., 0., 1., 0.])
+        gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) \
+                         + self.sim.data.get_site_xpos('gripperpalm')
+        print("gripper_target:", gripper_target)
+        print("currrent gripper position:", self.sim.data.get_site_xpos('gripperpalm'))
+        gripper_rotation = np.array([1., 0., 1., 0.]) # fixed oritation to grasp
         self.sim.data.set_mocap_pos('robot0:mocap', gripper_target)
         self.sim.data.set_mocap_quat('robot0:mocap', gripper_rotation)
         for _ in range(10):

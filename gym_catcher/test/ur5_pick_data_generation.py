@@ -50,8 +50,10 @@ def goToGoal(env, lastObs):
     episodeObs.append(lastObs)
 
     # end-effector approach to the object
-    while np.linalg.norm(object_oriented_goal) >= 0.05 and timeStep <= max_episode_steps:
+    while np.linalg.norm(object_oriented_goal) >= 0.04 and timeStep <= max_episode_steps:
         env.render()
+        print("step1: make the end-effector approach to the object")
+        print("distance:", np.linalg.norm(object_oriented_goal))
         action = [0, 0, 0, 0, 0, 0, 0]
         object_oriented_goal = object_rel_pos.copy()
         object_oriented_goal[2] += 0.05
@@ -76,6 +78,8 @@ def goToGoal(env, lastObs):
     # close the gripper
     while np.linalg.norm(object_rel_pos) >= 0.07 and timeStep <= max_episode_steps :
         env.render()
+        print("step2: close the gripper")
+        print("distance:", np.linalg.norm(object_rel_pos))
         action = [0, 0, 0, 0, 0, 0, 0]
         for i in range(len(object_rel_pos)):
             action[i] = object_rel_pos[i]*6
@@ -96,12 +100,14 @@ def goToGoal(env, lastObs):
     # move to the target goal
     while np.linalg.norm(goal - objectPos) >= 0.05 and timeStep <= max_episode_steps :
         env.render()
+        print("step3: move to the target goal")
+        print("distace:", np.linalg.norm(goal-objectPos))
         action = [0, 0, 0, 0, 0, 0, 0]
         for i in range(len(goal - objectPos)):
             action[i] = (goal - objectPos)[i]*6
-        print("move to target:", goal)
-        print("action:", action)
-        print("objectPos:", objectPos)
+        # print("move to target:", goal)
+        # print("action:", action)
+        # print("objectPos:", objectPos)
 
         # action[len(action)-1] = -0.005
         action[3:] = [0.8, 0.8, 0.8, 0.0] # close
@@ -118,6 +124,7 @@ def goToGoal(env, lastObs):
 
     while True: #limit the number of timesteps in the episode to a fixed duration
         env.render()
+        print("step4: time limit")
         action = [0, 0, 0, 0, 0, 0, 0]
         # action[len(action)-1] = -0.005 # keep the gripper closed
         action[3:] = [0.5, 0.5, 0.5, 0.0]
