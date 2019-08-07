@@ -45,7 +45,7 @@ class UR5PickEnv(robot_env.RobotEnv):
         self.reward_type = reward_type
 
         super(UR5PickEnv, self).__init__(
-            model_path=model_path, n_substeps=n_substeps, n_actions=4,
+            model_path=model_path, n_substeps=n_substeps, n_actions=7,
             initial_qpos=initial_qpos)
 
     # GoalEnv methods
@@ -64,11 +64,29 @@ class UR5PickEnv(robot_env.RobotEnv):
 
     def _step_callback(self):
         if self.block_gripper:
-            self.sim.data.set_joint_qpos('robot0:l_gripper_finger_joint', 0.)
-            self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
+            # self.sim.data.set_joint_qpos('robot0:l_gripper_finger_joint', 0.)
+            # self.sim.data.set_joint_qpos('robot0:r_gripper_finger_joint', 0.)
             self.sim.forward()
 
     def _set_action(self, action):
+        print("_set_action:", action)
+        assert action.shape == (7,)
+        action = action.copy()  # ensure that we don't change the action outside of this scope
+        pos_ctrl, gripper_ctrl = action[:3], action[3:]
+
+        pos_ctrl *= 0.05  # limit maximum change in position
+        rot_ctrl = [0.707, -0.707, 0., 0.]  # fixed rotation of the end effector, expressed as a quaternion
+        # gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
+        # assert gripper_ctrl.shape == (2,)
+        if self.block_gripper:
+            gripper_ctrl = np.zeros_like(gripper_ctrl)
+        action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
+
+        # Apply action to simulation.
+        utils.ctrl_set_action(self.sim, action)
+        utils.mocap_set_action(self.sim, action)
+
+    def _set_action_fetch(self, action):
         assert action.shape == (4,)
         action = action.copy()  # ensure that we don't change the action outside of this scope
         pos_ctrl, gripper_ctrl = action[:3], action[3]
@@ -88,10 +106,10 @@ class UR5PickEnv(robot_env.RobotEnv):
     def _get_obs(self):
         # positions
         # grip_pos - Position of the gripper given in 3 positional elements and 4 rotational elements
-        grip_pos = self.sim.data.get_site_xpos('robot0:grip')
+        grip_pos = self.sim.data.get_site_xpos('gripperpalm')
         dt = self.sim.nsubsteps * self.sim.model.opt.timestep
         # grip_velp - The velocity of gripper moving
-        grip_velp = self.sim.data.get_site_xvelp('robot0:grip') * dt
+        grip_velp = self.sim.data.get_site_xvelp('gripperpalm') * dt
         robot_qpos, robot_qvel = utils.robot_get_obs(self.sim)
         if self.has_object:
             # object_pos - Position of the object with respect to the world frame
@@ -132,7 +150,7 @@ class UR5PickEnv(robot_env.RobotEnv):
         }
 
     def _viewer_setup(self):
-        body_id = self.sim.model.body_name2id('robot0:gripper_link')
+        body_id = self.sim.model.body_name2id('gripperpalm')
         lookat = self.sim.data.body_xpos[body_id]
         for idx, value in enumerate(lookat):
             self.viewer.cam.lookat[idx] = value
@@ -185,7 +203,7 @@ class UR5PickEnv(robot_env.RobotEnv):
         self.sim.forward()
 
         # Move end effector into position.
-        gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) + self.sim.data.get_site_xpos('robot0:grip')
+        gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) + self.sim.data.get_site_xpos('gripperpalm')
         gripper_rotation = np.array([1., 0., 1., 0.])
         self.sim.data.set_mocap_pos('robot0:mocap', gripper_target)
         self.sim.data.set_mocap_quat('robot0:mocap', gripper_rotation)
@@ -193,7 +211,7 @@ class UR5PickEnv(robot_env.RobotEnv):
             self.sim.step()
 
         # Extract information for sampling goals.
-        self.initial_gripper_xpos = self.sim.data.get_site_xpos('robot0:grip').copy()
+        self.initial_gripper_xpos = self.sim.data.get_site_xpos('gripperpalm').copy()
         if self.has_object:
             self.height_offset = self.sim.data.get_site_xpos('object0')[2]
 

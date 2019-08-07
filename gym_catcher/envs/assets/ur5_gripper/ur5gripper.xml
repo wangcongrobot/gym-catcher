@@ -296,8 +296,21 @@ Control Engineering / Automation Engineering
                 </body>
             </body>
         </body>
+		<geom name="floor0" pos="0.8 0.75 0" size="0.85 0.7 1" type="plane" condim="3" material="floor_mat"></geom>
+		<body name="floor0" pos="0.8 0.75 0">
+			<site name="target0" pos="0 0 0.5" size="0.02 0.02 0.02" rgba="1 0 0 1" type="sphere"></site>
+		</body>
 
-        <!-- Target -->
+		<body pos="1.2 0.95 0.2" name="table0">
+			<geom size="0.35 0.55 0.2" type="box" mass="2000" material="table_mat"></geom>
+		</body>
+		<body name="object0" pos="0.025 0.025 0.025">
+			<joint name="object0:joint" type="free" damping="0.01"></joint>
+			<geom size="0.05 0.05 0.05" type="sphere" condim="3" name="object0" material="block_mat" mass="1"></geom>
+			<site name="object0" pos="0 0 0" size="0.02 0.02 0.02" rgba="1 0 0 1" type="sphere"></site>
+		</body>
+
+        <!-- Dynamic Target -->
 		<body name="tar" pos="2.2 0.75 1">
 			<joint axis="1 0 0" damping="0.01" name="tar:x" pos="0 0 0" stiffness="0" type="slide" frictionloss="0"/>
 			<joint axis="0 1 0" damping="0.01" name="tar:y" pos="0 0 0" stiffness="0" type="slide" frictionloss="0"/>
@@ -305,13 +318,6 @@ Control Engineering / Automation Engineering
 			<geom size="0.025 0.025 0.025" type="sphere" condim="3" name="tar" rgba="1 0 0 1" mass="2"/>
 			<site name="tar" pos="0 0 0" size="0.02 0.02 0.02" rgba="1 0 0 1" type="sphere"/>
 			<!--<geom conaffinity="0" contype="0" name="target" pos="0 0 0" rgba="0.9 0.2 0.2 1" size=".009" type="sphere"/>-->
-		</body>
-
-        <!-- Object0 -->
-		<body name="object0" pos="0.025 0.025 0.025">
-			<joint name="object0:joint" type="free" damping="0.01"></joint>
-			<geom size="0.025 0.025 0.025" type="box" condim="3" name="object0" material="block_mat" mass="2"></geom>
-			<site name="object0" pos="0 0 0" size="0.02 0.02 0.02" rgba="1 0 0 1" type="sphere"></site>
 		</body>
 
     </worldbody>
@@ -394,16 +400,16 @@ Control Engineering / Automation Engineering
 
         <!--Gripper-->
         <!-- position control mode -->
-        <position name='finger_1' ctrllimited="true" kp="20" joint='gripperfinger_1_joint_1' ctrlrange='0 1.2217'/>
-        <position name='finger_2' ctrllimited="true" kp="20" joint='gripperfinger_2_joint_1' ctrlrange='0 1.2217'/>
-        <position name='middle_finger'  ctrllimited="true" kp="20" joint='gripperfinger_middle_joint_1' ctrlrange='0 1.2217'/>
-        <position name='finger_scissor' ctrllimited="true" kp="20" joint='gripperpalm_finger_1_joint' ctrlrange="-0.2967 0.2967"/>
+        <!-- <position name='finger_1' ctrllimited="true" kp="20" joint='gripperfinger_1_joint_1' ctrlrange='0 1.2217'/> -->
+        <!-- <position name='finger_2' ctrllimited="true" kp="20" joint='gripperfinger_2_joint_1' ctrlrange='0 1.2217'/> -->
+        <!-- <position name='middle_finger'  ctrllimited="true" kp="20" joint='gripperfinger_middle_joint_1' ctrlrange='0 1.2217'/> -->
+        <!-- <position name='finger_scissor' ctrllimited="true" kp="20" joint='gripperpalm_finger_1_joint' ctrlrange="-0.2967 0.2967"/> -->
 
         <!-- force control mode -->
-        <!-- <motor name='finger_1_T' ctrllimited="true" joint='gripperfinger_1_joint_1' ctrlrange='-0.1 .8' gear="20"/> -->
-        <!-- <motor name='finger_2_T' ctrllimited="true" joint='gripperfinger_2_joint_1' ctrlrange='-0.1 .8' gear="20"/> -->
-        <!-- <motor name='middle_finger_T'  ctrllimited="true" joint='gripperfinger_middle_joint_1' ctrlrange='-0.1 .8' gear="20"/> -->
-        <!-- <motor name='finger_scissor_T' ctrllimited="true" joint='gripperpalm_finger_1_joint' ctrlrange="-0.8 0.8" gear="15"/> -->
+        <motor name='finger_1_T' ctrllimited="true" joint='gripperfinger_1_joint_1' ctrlrange='-0.1 .8' gear="20"/>
+        <motor name='finger_2_T' ctrllimited="true" joint='gripperfinger_2_joint_1' ctrlrange='-0.1 .8' gear="20"/>
+        <motor name='middle_finger_T'  ctrllimited="true" joint='gripperfinger_middle_joint_1' ctrlrange='-0.1 .8' gear="20"/>
+        <motor name='finger_scissor_T' ctrllimited="true" joint='gripperpalm_finger_1_joint' ctrlrange="-0.8 0.8" gear="15"/>
     </actuator>
 
     <sensor>

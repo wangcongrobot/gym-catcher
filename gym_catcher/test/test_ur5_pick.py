@@ -19,6 +19,7 @@ for i in range(20):
   env.render('human')
   for i in range(200):
     action = env.action_space.sample()
+    action = [0, 0, 0, 0, 0, 0, 0]
     print("action_space:", env.action_space)
     print("action space sample:", action)
     obs, reward, done, info = env.step(action)
