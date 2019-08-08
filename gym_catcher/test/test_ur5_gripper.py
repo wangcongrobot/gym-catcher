@@ -8,7 +8,7 @@ import gym_catcher
 mode = 'human'
 #mode = 'rgb_array'
 
-env = gym.make("UR5PickAndPlace-v0")
+env = gym.make("UR5Gripper-v0")
 
 env.render('human')
 #env = gym.wrappers.Monitor(env, './video', force=True)

@@ -1,4 +1,4 @@
-from gym.envs.registration import registry, register, make, spec
+from gym.envs.registration import register
 
 
 for reward_type in ['sparse', 'dense']:
@@ -8,8 +8,8 @@ for reward_type in ['sparse', 'dense']:
     }
 
     register(
-        id='UR5Catch{}-v0'.format(suffix),
-        entry_point='gym_catcher.envs:UR5CatchEnv',
+        id='UR5Gripper{}-v0'.format(suffix),
+        entry_point='gym_catcher.envs:UR5GripperEnv',
         max_episode_steps=250,
         kwargs={**kwargs, **dict(
             add_high_res_output=False,
@@ -24,4 +24,11 @@ for reward_type in ['sparse', 'dense']:
         entry_point='gym_catcher.envs:UR5PickAndPlaceEnv',
         kwargs=kwargs,
         max_episode_steps=50,
+    )
+
+    register(
+        id='UR5Catch{}-v0'.format(suffix),
+        entry_point='gym_catcher.envs:UR5CatchEnv',
+        kwargs=kwargs,
+        max_episode_steps=50
     )

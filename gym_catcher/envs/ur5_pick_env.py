@@ -3,6 +3,7 @@ import numpy as np
 from gym.envs.robotics import rotations, utils
 from gym_catcher.envs import robot_env
 
+from gym_catcher.utils.dm_utils.rewards import tolerance 
 
 def goal_distance(goal_a, goal_b):
     assert goal_a.shape == goal_b.shape
@@ -44,20 +45,117 @@ class UR5PickEnv(robot_env.RobotEnv):
         self.distance_threshold = distance_threshold
         self.reward_type = reward_type
 
+        # add some variables
+        self.action = None
+        self.end_location = None
+        self.n_actions = 7
+
         super(UR5PickEnv, self).__init__(
-            model_path=model_path, n_substeps=n_substeps, n_actions=7,
+            model_path=model_path, n_substeps=n_substeps, n_actions=self.n_actions,
             initial_qpos=initial_qpos)
+
+    # add new function for catch env
+    def _restart_target(self):
+        target_x = self.np_random.uniform(low=0.52, high=0.84)
+        target_y = self.np_random.uniform(low=-0.23, high=0.23)
+
+        self.end_location = [2.2 - target_x, 0.75 + target_y, 0.66]
+
+        y = self.np_random.uniform(low=-0.5, high=0.5)
+        z = self.np_random.uniform(low=-0.15, high=0.)
+        z_offset = 0.34 + z
+        v_z = self.np_random.uniform(low=1.9, high=2.3)
+
+        del_y = y - target_y
+
+        target_dist = np.sqrt(del_y * del_y + target_x * target_x)
+
+        sin_theta = target_x / target_dist
+
+        v = target_dist * 9.81 / (v_z + np.sqrt(v_z * v_z + 19.62 * z_offset))
+
+        v_x = v * sin_theta
+        v_y = np.sign(del_y) * v * np.sqrt(1. - sin_theta * sin_theta)
+
+        self.sim.data.set_joint_qpos('tar:x', 0.0)
+        self.sim.data.set_joint_qpos('tar:y', y)
+        self.sim.data.set_joint_qpos('tar:z', z)
+        self.sim.data.set_joint_qvel('tar:x', - v_x)
+        self.sim.data.set_joint_qvel('tar:y', - v_y)
+        self.sim.data.set_joint_qvel('tar:z', v_z)
+
 
     # GoalEnv methods
     # ----------------------------
 
-    def compute_reward(self, achieved_goal, goal, info):
+    def compute_reward_simple(self, achieved_goal, goal, info):
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal, goal)
         if self.reward_type == 'sparse':
             return -(d > self.distance_threshold).astype(np.float32)
         else:
             return -d
+
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        print("compute_reward")
+        pos_action = self.action[:3]
+        reward_ctrl = - 0.05 * np.square(pos_action).sum()
+
+        dist_to_end_location = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - 
+                                              self.end_location)
+        reward_dist = tolerance(dist_to_end_location, margin=0.8, bounds=(0., 0.02),
+                                sigmoid='linear', 
+                                value_at_margin=0.)
+        reward = 0.25 * reward_dist
+        
+        # if z < 0.1, then restart
+        if self.sim.data.get_site_xpos('tar')[2] < 0.1:
+            self._restart_target()
+        
+        sparse_reward = 0.
+        dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - # the position of the end-effector
+                              self.sim.data.get_site_xpos('tar')) # the position of target
+        if dist < 0.05:
+            reward += 2.
+            sparse_reward += 1.
+            self._restart_target()
+
+        reward += reward_ctrl
+
+        info = dict(scoring_reward=sparse_reward)
+
+        return reward
+
+    # new reward compute function for catch env
+    def compute_reward_catch(self, achieved_goal, goal, info):
+        print("compute_reward")
+        print("self.action:",  self.action)
+        reward_ctrl = - 0.05 * np.square(self.action).sum()
+
+        dist_to_end_location = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') -
+                                              self.end_location)
+        reward_dist = tolerance(dist_to_end_location, margin=0.8, bounds=(0., 0.02),
+                                sigmoid='linear',
+                                value_at_margin=0.)
+
+        reward = 0.25 * reward_dist
+
+        if self.sim.data.get_site_xpos('tar')[2] < 0.1: # if z < 0.1, then drop out and restart
+            self._restart_target()
+
+        sparse_reward = 0.
+        dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') -
+                              self.sim.data.get_site_xpos('tar'))
+        if dist < 0.05:
+            reward += 20.
+            sparse_reward += 10.
+            self._restart_target()
+
+        reward += reward_ctrl
+
+        info = dict(scoring_reward=sparse_reward)
+
+        return reward, False, info
 
     # RobotEnv methods
     # ----------------------------
@@ -71,6 +169,7 @@ class UR5PickEnv(robot_env.RobotEnv):
     def _set_action(self, action):
         # print("_set_action:", action)
         assert action.shape == (7,)
+        self.action = action
         action = action.copy()  # ensure that we don't change the action outside of this scope
         pos_ctrl, gripper_ctrl = action[:3], action[3:]
 
@@ -167,6 +266,8 @@ class UR5PickEnv(robot_env.RobotEnv):
 
     def _reset_sim(self):
         self.sim.set_state(self.initial_state)
+        self._restart_target()
+        self.sim.forward()
 
         # Randomize start position of object.
         if self.has_object:

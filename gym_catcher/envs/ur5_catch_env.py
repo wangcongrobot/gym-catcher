@@ -1,36 +1,23 @@
-# the ur5 and 3-finger gripper env, with no img
-# from flow_rl gym env
-
 import numpy as np
 
 from gym.envs.robotics import rotations, utils
-from gym_catcher.envs import robot_env_m
+from gym_catcher.envs import robot_env
+
 from gym_catcher.utils.dm_utils.rewards import tolerance 
-from copy import copy
-from collections import deque
-
-import matplotlib.pyplot as plot
-
-import mujoco_py
 
 def goal_distance(goal_a, goal_b):
     assert goal_a.shape == goal_b.shape
     return np.linalg.norm(goal_a - goal_b, axis=-1)
 
 
-class UR5GripperEnv(robot_env_m.RobotEnvM):
-    """Superclass for all UR5 and Robotq 3 finger gripper environments.
-    derive from Fetch and Catch environments
+class UR5CatchEnv(robot_env.RobotEnv):
+    """Superclass for all Fetch environments.
     """
 
     def __init__(
         self, model_path, n_substeps, gripper_extra_height, block_gripper,
         has_object, target_in_the_air, target_offset, obj_range, target_range,
         distance_threshold, initial_qpos, reward_type,
-        add_high_res_output,
-        no_movement,
-        stack_frames,
-        camera_3
     ):
         """Initializes a new Fetch environment.
 
@@ -58,35 +45,86 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         self.distance_threshold = distance_threshold
         self.reward_type = reward_type
 
-        # add viable for catch env
-        self.add_high_res_output = add_high_res_output
-        self.no_movement = no_movement
-        self.stack_frames = stack_frames
-        self.camera_3 = camera_3
-
-        self.target_z_l = 4
-        # self.target_z_position = deque(maxlen=self.target_z_l)
-
-        self.last_img = None
-        self.last_img2 = None
-        self.last_vec = None
-
+        # add some variables
+        self.action = None
         self.end_location = None
-
-        self.tmp_data = []
-
-        # position of the end-effector (x, y, z)
-        # gripper: 4
         self.n_actions = 7
 
-        self.action = None        
-
-        super(UR5GripperEnv, self).__init__(
+        super(UR5CatchEnv, self).__init__(
             model_path=model_path, n_substeps=n_substeps, n_actions=self.n_actions,
             initial_qpos=initial_qpos)
 
+    # add new function for catch env
+    def _restart_target(self):
+        target_x = self.np_random.uniform(low=0.52, high=0.84)
+        target_y = self.np_random.uniform(low=-0.23, high=0.23)
+
+        self.end_location = [2.2 - target_x, 0.75 + target_y, 0.66]
+
+        y = self.np_random.uniform(low=-0.5, high=0.5)
+        z = self.np_random.uniform(low=-0.15, high=0.)
+        z_offset = 0.34 + z
+        v_z = self.np_random.uniform(low=1.9, high=2.3)
+
+        del_y = y - target_y
+
+        target_dist = np.sqrt(del_y * del_y + target_x * target_x)
+
+        sin_theta = target_x / target_dist
+
+        v = target_dist * 9.81 / (v_z + np.sqrt(v_z * v_z + 19.62 * z_offset))
+
+        v_x = v * sin_theta
+        v_y = np.sign(del_y) * v * np.sqrt(1. - sin_theta * sin_theta)
+
+        self.sim.data.set_joint_qpos('tar:x', 0.0)
+        self.sim.data.set_joint_qpos('tar:y', y)
+        self.sim.data.set_joint_qpos('tar:z', z)
+        self.sim.data.set_joint_qvel('tar:x', - v_x)
+        self.sim.data.set_joint_qvel('tar:y', - v_y)
+        self.sim.data.set_joint_qvel('tar:z', v_z)
+
+
     # GoalEnv methods
     # ----------------------------
+
+    def compute_reward_simple(self, achieved_goal, goal, info):
+        # Compute distance between goal and the achieved goal.
+        d = goal_distance(achieved_goal, goal)
+        if self.reward_type == 'sparse':
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            return -d
+
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        print("compute_reward")
+        pos_action = self.action[:3]
+        reward_ctrl = - 0.05 * np.square(pos_action).sum()
+
+        dist_to_end_location = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - 
+                                              self.end_location)
+        reward_dist = tolerance(dist_to_end_location, margin=0.8, bounds=(0., 0.02),
+                                sigmoid='linear', 
+                                value_at_margin=0.)
+        reward = 0.25 * reward_dist
+        
+        # if z < 0.1, then restart
+        if self.sim.data.get_site_xpos('tar')[2] < 0.1:
+            self._restart_target()
+        
+        sparse_reward = 0.
+        dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - # the position of the end-effector
+                              self.sim.data.get_site_xpos('tar')) # the position of target
+        if dist < 0.05:
+            reward += 2.
+            sparse_reward += 1.
+            self._restart_target()
+
+        reward += reward_ctrl
+
+        info = dict(scoring_reward=sparse_reward)
+
+        return reward
 
     # new reward compute function for catch env
     def compute_reward_catch(self, achieved_goal, goal, info):
@@ -119,48 +157,6 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
 
         return reward, False, info
 
-    # fetch
-    def compute_reward(self, achieved_goal, goal, info):
-        # Compute distance between goal and the achieved goal.
-        d = goal_distance(achieved_goal, goal)
-        if self.reward_type == 'sparse':
-            return -(d > self.distance_threshold).astype(np.float32)
-        else:
-            return -d
-
-    # add new function for catch env
-    # random initial position and velocity for the target ball
-    def _restart_target(self):
-        target_x = self.np_random.uniform(low=0.52, high=0.84)
-        target_y = self.np_random.uniform(low=-0.23, high=0.23)
-
-        self.end_location = [2.2 - target_x, 0.75 + target_y, 0.66]
-
-        y = self.np_random.uniform(low=-0.5, high=0.5)
-        z = self.np_random.uniform(low=-0.15, high=0.)
-        z_offset = 0.34 + z
-        v_z = self.np_random.uniform(low=1.9, high=2.3)
-
-        del_y = y - target_y
-
-        target_dist = np.sqrt(del_y * del_y + target_x * target_x)
-
-        sin_theta = target_x / target_dist
-
-        v = target_dist * 9.81 / (v_z + np.sqrt(v_z * v_z + 19.62 * z_offset))
-
-        v_x = v * sin_theta
-        v_y = np.sign(del_y) * v * np.sqrt(1. - sin_theta * sin_theta)
-
-        self.sim.data.set_joint_qpos('tar:x', 0.0)
-        self.sim.data.set_joint_qpos('tar:y', y)
-        self.sim.data.set_joint_qpos('tar:z', z)
-        self.sim.data.set_joint_qvel('tar:x', - v_x)
-        self.sim.data.set_joint_qvel('tar:y', - v_y)
-        self.sim.data.set_joint_qvel('tar:z', v_z)
-        print("tar:", y,z,v_x,v_y,v_z)
-
-
     # RobotEnv methods
     # ----------------------------
 
@@ -171,113 +167,58 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
             self.sim.forward()
 
     def _set_action(self, action):
-        assert action.shape == (self.n_actions,)
+        # print("_set_action:", action)
+        assert action.shape == (7,)
+        self.action = action
         action = action.copy()  # ensure that we don't change the action outside of this scope
         pos_ctrl, gripper_ctrl = action[:3], action[3:]
 
-        # pos_ctrl *= 0.05  # limit maximum change in position
-        rot_ctrl = [0., 0., -1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
+        pos_ctrl *= 0.05  # limit maximum change in position
+        rot_ctrl = [0.707, -0.707, 0., 0.]  # fixed rotation of the end effector, expressed as a quaternion
         # gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
-        print("pos_ctrl:", pos_ctrl)
-        # print("rot_ctrl:", rot_ctrl)
-        print("gripper_ctrl:", gripper_ctrl)
-        # assert gripper_ctrl.shape == (4,)
+        # assert gripper_ctrl.shape == (2,)
         if self.block_gripper:
             gripper_ctrl = np.zeros_like(gripper_ctrl)
-            print("block_gripper")
         action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-        # action = np.concatenate([pos_ctrl, gripper_ctrl])
-        print("action:", action)
 
         # Apply action to simulation.
         utils.ctrl_set_action(self.sim, action)
         utils.mocap_set_action(self.sim, action)
 
-    # change function for catch env
-    def _set_action_catch(self, action):
-        assert action.shape == (self.n_actions,) # 7
+    def _set_action_fetch(self, action):
+        assert action.shape == (4,)
+        action = action.copy()  # ensure that we don't change the action outside of this scope
+        pos_ctrl, gripper_ctrl = action[:3], action[3]
 
-        self.action = action
+        pos_ctrl *= 0.05  # limit maximum change in position
+        rot_ctrl = [1., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
+        gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
+        assert gripper_ctrl.shape == (2,)
+        if self.block_gripper:
+            gripper_ctrl = np.zeros_like(gripper_ctrl)
+        action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
 
-        if not self.no_movement:
-            while action.shape < (4,):
-                action = np.append(action, [0.])
-            if self.sim.data.get_site_xpos('gripperpalm')[0] < 1.3 and action[0] < 0.:
-                action[0] = 0.
-            if self.sim.data.get_site_xpos('gripperpalm')[0] > 1.8 and action[0] > 0.:
-                action[0] = 0.
-
-            if self.sim.data.get_site_xpos('gripperpalm')[1] < 0.4 and action[1] < 0.:
-                action[1] = 0.
-            if self.sim.data.get_site_xpos('gripperpalm')[1] > 1.1 and action[1] > 0.:
-                action[1] = 0.
-
-            if self.sim.data.get_site_xpos('gripperpalm')[2] < 0.47 and action[2] < 0.:
-                action[2] = 0.
-            if self.sim.data.get_site_xpos('gripperpalm')[2] > 0.87 and action[2] > 0.:
-                action[2] = 0.
-
-            action = action.copy()  # ensure that we don't change the action outside of this scope
-            pos_ctrl, gripper_ctrl = action[:3], action[3]
-
-            pos_ctrl *= 0.05  # limit maximum change in position
-            rot_ctrl = [1., 0., 0., 0.]
-            gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
-            assert gripper_ctrl.shape == (2,)
-            if self.block_gripper:
-                gripper_ctrl = np.zeros_like(gripper_ctrl)
-            action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-            print("action:", action)
-            # print("action size:", action.size())
-            # Apply action to simulation.
-            utils.ctrl_set_action(self.sim, action)
-            utils.mocap_set_action(self.sim, action)
-        else:
-            pass
-    # from the hand env
-    def _set_action1(self, action):
-        assert action.shape == (20,)
-
-        ctrlrange = self.sim.model.actuator_ctrlrange
-        actuation_range = (ctrlrange[:, 1] - ctrlrange[:, 0]) / 2.
-        if self.relative_control:
-            actuation_center = np.zeros_like(action)
-            for i in range(self.sim.data.ctrl.shape[0]):
-                actuation_center[i] = self.sim.data.get_joint_qpos(
-                    self.sim.model.actuator_names[i].replace(':A_', ':'))
-            for joint_name in ['FF', 'MF', 'RF', 'LF']:
-                act_idx = self.sim.model.actuator_name2id(
-                    'robot0:A_{}J1'.format(joint_name))
-                actuation_center[act_idx] += self.sim.data.get_joint_qpos(
-                    'robot0:{}J0'.format(joint_name))
-        else:
-            actuation_center = (ctrlrange[:, 1] + ctrlrange[:, 0]) / 2.
-        self.sim.data.ctrl[:] = actuation_center + action * actuation_range
-        self.sim.data.ctrl[:] = np.clip(self.sim.data.ctrl, ctrlrange[:, 0], ctrlrange[:, 1])
+        # Apply action to simulation.
+        utils.ctrl_set_action(self.sim, action)
+        utils.mocap_set_action(self.sim, action)
 
     def _get_obs(self):
         # positions
         # grip_pos - Position of the gripper given in 3 positional elements and 4 rotational elements
         grip_pos = self.sim.data.get_site_xpos('gripperpalm')
-        # print("grip_pos:", grip_pos)
         dt = self.sim.nsubsteps * self.sim.model.opt.timestep
         # grip_velp - The velocity of gripper moving
         grip_velp = self.sim.data.get_site_xvelp('gripperpalm') * dt
-        # print("grip_velp:", grip_velp)
         robot_qpos, robot_qvel = utils.robot_get_obs(self.sim)
-        # print("sim.data.qpos:", self.sim.data.qpos)
-        # print("model.joint_name:", self.sim.model.joint_names)
-        # print("robot_qpos:", robot_qpos)
-        # print("robot_qvel:", robot_qvel)
         if self.has_object:
             # object_pos - Position of the object with respect to the world frame
-            object_pos = self.sim.data.get_site_xpos('tar') 
+            object_pos = self.sim.data.get_site_xpos('object0') 
             # rotations object_rot - Yes. That is the orientation of the object with respect to world frame.
-            object_rot = rotations.mat2euler(self.sim.data.get_site_xmat('tar'))
+            object_rot = rotations.mat2euler(self.sim.data.get_site_xmat('object0'))
             # velocities object_velp - Positional velocity of the object with respect to the world frame
-            object_velp = self.sim.data.get_site_xvelp('tar') * dt
+            object_velp = self.sim.data.get_site_xvelp('object0') * dt
             # object_velr - Rotational velocity of the object with respect to the world frame
-            object_velr = self.sim.data.get_site_xvelr('tar') * dt
+            object_velr = self.sim.data.get_site_xvelr('object0') * dt
             # gripper state
             # object_rel_pos - Position of the object relative to the gripper
             object_rel_pos = object_pos - grip_pos
@@ -302,12 +243,10 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         ])
 
         return {
-            # 'observation': robot_qvel.copy(),
             'observation': obs.copy(),
             'achieved_goal': achieved_goal.copy(),
             'desired_goal': self.goal.copy(),
         }
-
 
     def _viewer_setup(self):
         body_id = self.sim.model.body_name2id('gripperpalm')
@@ -321,32 +260,24 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
     def _render_callback(self):
         # Visualize target.
         sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
-        site_id = self.sim.model.site_name2id('tar')
+        site_id = self.sim.model.site_name2id('target0')
         self.sim.model.site_pos[site_id] = self.goal - sites_offset[0]
         self.sim.forward()
 
-    # add new viable to reset
     def _reset_sim(self):
         self.sim.set_state(self.initial_state)
-        self.last_img = None
-        self.last_img2 = None
-        self.last_vec = None
-        # Randomize start position of object.
         self._restart_target()
+        self.sim.forward()
 
-        # if self.has_object:
-        #     object_xpos = self.initial_gripper_xpos[:2]
-        #     while np.linalg.norm(object_xpos - self.initial_gripper_xpos[:2]) < 0.1:
-        #         object_xpos = self.initial_gripper_xpos[:2] + self.np_random.uniform(-self.obj_range, self.obj_range, size=2)
-        #     object_qpos = self.sim.data.get_joint_qpos('object0:joint')
-        #     object_xpos1 = self.sim.data.get_body_xpos('tar')
-        #     object_xquat1 = self.sim.data.get_body_xquat('tar')
-        #     object_qpos = np.concatenate([object_xpos1, object_xquat1])
-        #     print("object_qpos:", object_qpos)
-        #     print("object_xpos:", object_xpos)
-        #     assert object_qpos.shape == (7,)
-        #     object_qpos[:2] = object_xpos
-        #     self.sim.data.set_joint_qpos('tar', object_qpos)
+        # Randomize start position of object.
+        if self.has_object:
+            object_xpos = self.initial_gripper_xpos[:2]
+            while np.linalg.norm(object_xpos - self.initial_gripper_xpos[:2]) < 0.1:
+                object_xpos = self.initial_gripper_xpos[:2] + self.np_random.uniform(-self.obj_range, self.obj_range, size=2)
+            object_qpos = self.sim.data.get_joint_qpos('object0:joint')
+            assert object_qpos.shape == (7,)
+            object_qpos[:2] = object_xpos
+            self.sim.data.set_joint_qpos('object0:joint', object_qpos)
 
         self.sim.forward()
         return True
@@ -373,11 +304,13 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         self.sim.forward()
 
         # Move end effector into position.
-        gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) + self.sim.data.get_site_xpos('gripperpalm') 
-        # change rotation
-        gripper_rotation = np.array([1., 0., 0., 0.])
-        # self.sim.data.set_mocap_pos('gripperpalm', gripper_target)
-        # self.sim.data.set_mocap_quat('gripperpalm', gripper_rotation)
+        gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) \
+                         + self.sim.data.get_site_xpos('gripperpalm')
+        print("gripper_target:", gripper_target)
+        print("currrent gripper position:", self.sim.data.get_site_xpos('gripperpalm'))
+        gripper_rotation = np.array([1., 0., 1., 0.]) # fixed oritation to grasp
+        self.sim.data.set_mocap_pos('robot0:mocap', gripper_target)
+        self.sim.data.set_mocap_quat('robot0:mocap', gripper_rotation)
         for _ in range(10):
             self.sim.step()
 
@@ -386,5 +319,5 @@ class UR5GripperEnv(robot_env_m.RobotEnvM):
         if self.has_object:
             self.height_offset = self.sim.data.get_site_xpos('object0')[2]
 
-    def render(self, mode='human', width=500, height=500, camera_id=-1):
-        return super(UR5GripperEnv, self).render(mode, width, height, camera_id)
+    def render(self, mode='human', width=500, height=500):
+        return super(UR5CatchEnv, self).render(mode, width, height)
