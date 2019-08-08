@@ -13,3 +13,12 @@ env.render()
 
 or:
 python gym_catcher/test/test_ur5.py
+
+# training result
+
+![train_success_rate](https://github.com/wangcongrobot/gym-catcher/blob/master/gym_catcher/images/train_success_rate.svg)
+
+![test_success_rate](https://github.com/wangcongrobot/gym-catcher/blob/master/gym_catcher/images/test_success_rate.svg)
+
+
+
