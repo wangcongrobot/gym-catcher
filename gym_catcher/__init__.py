@@ -10,7 +10,7 @@ for reward_type in ['sparse', 'dense']:
     register(
         id='UR5Gripper{}-v0'.format(suffix),
         entry_point='gym_catcher.envs:UR5GripperEnv',
-        max_episode_steps=250,
+        max_episode_steps=50,
         kwargs={**kwargs, **dict(
             add_high_res_output=False,
             no_movement=False,
@@ -31,4 +31,11 @@ for reward_type in ['sparse', 'dense']:
         entry_point='gym_catcher.envs:UR5CatchEnv',
         kwargs=kwargs,
         max_episode_steps=50
+    )
+
+    register(
+        id="UR5KeepUp{}-v0".format(suffix),
+        entry_point='gym_catcher.envs:UR5KeepUpEnv',
+        max_episode_steps=50,
+        kwargs=kwargs
     )

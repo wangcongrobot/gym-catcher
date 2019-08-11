@@ -88,74 +88,13 @@ class UR5PickEnv(robot_env.RobotEnv):
     # GoalEnv methods
     # ----------------------------
 
-    def compute_reward_simple(self, achieved_goal, goal, info):
+    def compute_reward(self, achieved_goal, goal, info):
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal, goal)
         if self.reward_type == 'sparse':
             return -(d > self.distance_threshold).astype(np.float32)
         else:
             return -d
-
-    def compute_reward(self, achieved_goal, desired_goal, info):
-        print("compute_reward")
-        pos_action = self.action[:3]
-        reward_ctrl = - 0.05 * np.square(pos_action).sum()
-
-        dist_to_end_location = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - 
-                                              self.end_location)
-        reward_dist = tolerance(dist_to_end_location, margin=0.8, bounds=(0., 0.02),
-                                sigmoid='linear', 
-                                value_at_margin=0.)
-        reward = 0.25 * reward_dist
-        
-        # if z < 0.1, then restart
-        if self.sim.data.get_site_xpos('tar')[2] < 0.1:
-            self._restart_target()
-        
-        sparse_reward = 0.
-        dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - # the position of the end-effector
-                              self.sim.data.get_site_xpos('tar')) # the position of target
-        if dist < 0.05:
-            reward += 2.
-            sparse_reward += 1.
-            self._restart_target()
-
-        reward += reward_ctrl
-
-        info = dict(scoring_reward=sparse_reward)
-
-        return reward
-
-    # new reward compute function for catch env
-    def compute_reward_catch(self, achieved_goal, goal, info):
-        print("compute_reward")
-        print("self.action:",  self.action)
-        reward_ctrl = - 0.05 * np.square(self.action).sum()
-
-        dist_to_end_location = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') -
-                                              self.end_location)
-        reward_dist = tolerance(dist_to_end_location, margin=0.8, bounds=(0., 0.02),
-                                sigmoid='linear',
-                                value_at_margin=0.)
-
-        reward = 0.25 * reward_dist
-
-        if self.sim.data.get_site_xpos('tar')[2] < 0.1: # if z < 0.1, then drop out and restart
-            self._restart_target()
-
-        sparse_reward = 0.
-        dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') -
-                              self.sim.data.get_site_xpos('tar'))
-        if dist < 0.05:
-            reward += 20.
-            sparse_reward += 10.
-            self._restart_target()
-
-        reward += reward_ctrl
-
-        info = dict(scoring_reward=sparse_reward)
-
-        return reward, False, info
 
     # RobotEnv methods
     # ----------------------------
