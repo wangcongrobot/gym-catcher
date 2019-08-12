@@ -312,7 +312,7 @@ Control Engineering / Automation Engineering
 		</body> -->
 
         <!-- Dynamic Target -->
-		<body name="tar" pos="0.5 0.8 1.5">
+		<body name="tar" pos="0.9 1.0 1.5">
 			<!-- <joint axis="1 0 0" damping="0.01" name="tar:x" pos="0 0 0" stiffness="0" type="slide" frictionloss="0"/>
 			<joint axis="0 1 0" damping="0.01" name="tar:y" pos="0 0 0" stiffness="0" type="slide" frictionloss="0"/>
 			<joint axis="0 0 1" damping="0.01" name="tar:z" pos="0 0 0" stiffness="0" type="slide" frictionloss="0"/> -->

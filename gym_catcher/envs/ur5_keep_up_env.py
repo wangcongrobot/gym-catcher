@@ -264,7 +264,7 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         pos_ctrl, gripper_ctrl = action[:3], action[3:]
 
         pos_ctrl *= 0.05  # limit maximum change in position
-        rot_ctrl = [1., 0., 0., 0.]  # fixed rotation of the end effector, expressed as a quaternion
+        rot_ctrl = [0., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
         # gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
         # assert gripper_ctrl.shape == (2,)
         if self.block_gripper:
@@ -395,9 +395,10 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         # Move end effector into position.
         gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) \
                          + self.sim.data.get_site_xpos('gripperpalm')
+        # gripper_target = [0.8, 0, 0.5]
         print("gripper_target:", gripper_target)
         print("currrent gripper position:", self.sim.data.get_site_xpos('gripperpalm'))
-        gripper_rotation = np.array([1., 0., 1., 0.]) # fixed oritation to grasp
+        gripper_rotation = np.array([0., 0., 1., 0.]) # fixed oritation to grasp
         self.sim.data.set_mocap_pos('robot0:mocap', gripper_target)
         self.sim.data.set_mocap_quat('robot0:mocap', gripper_rotation)
         for _ in range(10):

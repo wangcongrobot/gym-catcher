@@ -1,0 +1,18 @@
+Logging to ./log_stable_her/
+-----------------------------------------
+| current_lr              | 0.001       |
+| ent_coef                | 0.02364633  |
+| ent_coef_loss           | -11.44643   |
+| entropy                 | 4.556044    |
+| episodes                | 100         |
+| fps                     | 28          |
+| mean 100 episode reward | 8.4         |
+| n_updates               | 4850        |
+| policy_loss             | -7.051834   |
+| qf1_loss                | 0.109429665 |
+| qf2_loss                | 0.11267254  |
+| success rate            | 0           |
+| time_elapsed            | 174         |
+| total timesteps         | 4950        |
+| value_loss              | 0.35492587  |
+-----------------------------------------
