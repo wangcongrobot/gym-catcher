@@ -174,14 +174,21 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
 
         reward_ctrl = - 0.05 * np.square(self.action).sum()
         
-        dist_end_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm')[:2] - 
-                                            self.sim.data.get_site_xpos('tar')[:2])
-        dist_finger_1_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_1_polp_3')[:2] - 
-                                                 self.sim.data.get_site_xpos('tar')[:2])
-        dist_finger_2_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_2_polp_3')[:2] - 
-                                                 self.sim.data.get_site_xpos('tar')[:2])
-        dist_finger_middle_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_middle_polp_3')[:2] - 
-                                                      self.sim.data.get_site_xpos('tar')[:2])
+        dist_end_to_target1 = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - 
+                                            self.sim.data.get_site_xpos('tar'))
+        # print("dist1: ", dist_end_to_target1)
+        dist_end_to_target = np.linalg.norm(self.sim.data.get_mocap_pos('robot0:mocap') - 
+                                            self.sim.data.get_site_xpos('tar'))
+        # print("dist2: ", dist_end_to_target)
+        # print("gripperpalm: ", self.sim.data.get_site_xpos('gripperpalm'))
+        # print("robot0:mocap: ", self.sim.data.get_mocap_pos('robot0:mocap'))
+        # print("tar: ", self.sim.data.get_site_xpos('tar'))
+        dist_finger_1_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_1_polp_3') - 
+                                                 self.sim.data.get_site_xpos('tar'))
+        dist_finger_2_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_2_polp_3') - 
+                                                 self.sim.data.get_site_xpos('tar'))
+        dist_finger_middle_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_middle_polp_3') - 
+                                                      self.sim.data.get_site_xpos('tar'))
 
         reward_dist = tolerance(dist_end_to_target, margin=0.5, bounds=(0., 0.02),
                                 sigmoid='linear',
@@ -190,12 +197,16 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         sparse_reward = 0.
         if dist_end_to_target < 0.05:
             sparse_reward += 1.
-        if dist_finger_1_to_target < 0.05 or dist_finger_2_to_target < 0.05 or dist_finger_middle_to_target < 0.05:
-            sparse_reward += 2.
+            if (dist_finger_1_to_target < 0.05) or (dist_finger_2_to_target < 0.05) or (dist_finger_middle_to_target < 0.05):
+                sparse_reward += 2.
         
 
         # reward = 0.2 * reward_dist + reward_ctrl
-        reward = reward_ctrl + dist_end_to_target * -0.05 + sparse_reward
+        # print("reward_ctrl: ", reward_ctrl)
+        # print("dist_end_to_target: ", dist_end_to_target)
+        # print("reward_dist: ", reward_dist)
+        # print("sparse_reward: ", sparse_reward)
+        reward = reward_ctrl + dist_end_to_target * -0.5 + sparse_reward
 
         # done = False
         # if self.sim.data.get_site_xpos('tar')[2] < 0.1: # z < 0.1
