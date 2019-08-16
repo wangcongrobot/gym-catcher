@@ -8,7 +8,7 @@ actions = []
 observations = []
 infos = []
 
-max_episode_steps = 100
+max_episode_steps = 150
 
 def main():
     env = gym.make('UR5KeepUp-v0')
@@ -50,7 +50,7 @@ def goToGoal(env, lastObs):
     episodeObs.append(lastObs)
 
     # end-effector approach to the object
-    while np.linalg.norm(object_oriented_goal) >= 0.05 and timeStep <= max_episode_steps:
+    while np.linalg.norm(object_oriented_goal) >= 0.06 and timeStep <= max_episode_steps:
         env.render()
         print("step1: let the end-effector approach to the object")
         print("distance:", np.linalg.norm(object_oriented_goal))
@@ -85,7 +85,9 @@ def goToGoal(env, lastObs):
             action[i] = object_rel_pos[i]*6
 
         # action[len(action)-1] = -0.005
-        action[3:] = [0.8, 0.8, 0.8, 0.0] # close
+        action[3:] = [0.5, 0.5, 0.5, 0.0] # close
+        for _ in range(10):
+            env.step(action)
 
         obsDataNew, reward, done, info = env.step(action)
         timeStep += 1
@@ -110,7 +112,7 @@ def goToGoal(env, lastObs):
         # print("objectPos:", objectPos)
 
         # action[len(action)-1] = -0.005
-        action[3:] = [0.8, 0.8, 0.8, 0.0] # close
+        action[3:] = [0.5, 0.5, 0.5, 0.0] # close
 
         obsDataNew, reward, done, info = env.step(action)
         timeStep += 1

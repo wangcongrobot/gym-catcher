@@ -141,12 +141,12 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         reward = 0.25 * reward_dist
         
         # if z < 0.1, then restart
-        if self.sim.data.get_site_xpos('tar')[2] < 0.1:
+        if self.sim.data.get_site_xpos('object')[2] < 0.1:
             self._restart_target()
         
         sparse_reward = 0.
         dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - # the position of the end-effector
-                              self.sim.data.get_site_xpos('tar')) # the position of target
+                              self.sim.data.get_site_xpos('object')) # the position of target
         print("dist:", dist)
         if dist < 0.05:
             reward += 2.
@@ -170,35 +170,50 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         return reward
 
     # compute reward keep up
-    def compute_reward(self, achieved_goal, desired_goal, info):
+    def compute_reward111(self, achieved_goal, desired_goal, info):
+
+        obj_pos = self.sim.data.get_site_xpos('object')
+        palm_pos = self.sim.data.get_mocap_pos('robot0:mocap')
+        target_pos = self.sim.data.get_site_xpos('target')
 
         reward_ctrl = - 0.05 * np.square(self.action).sum()
         
-        dist_end_to_target1 = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - 
-                                            self.sim.data.get_site_xpos('tar'))
-        # print("dist1: ", dist_end_to_target1)
-        dist_end_to_target = np.linalg.norm(self.sim.data.get_mocap_pos('robot0:mocap') - 
-                                            self.sim.data.get_site_xpos('tar'))
-        # print("dist2: ", dist_end_to_target)
-        # print("gripperpalm: ", self.sim.data.get_site_xpos('gripperpalm'))
-        # print("robot0:mocap: ", self.sim.data.get_mocap_pos('robot0:mocap'))
-        # print("tar: ", self.sim.data.get_site_xpos('tar'))
+        # dist_end_to_target1 = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') - 
+        #                                     self.sim.data.get_site_xpos('object'))
+        # # print("dist1: ", dist_end_to_target1)
+        # dist_end_to_target = np.linalg.norm(self.sim.data.get_mocap_pos('robot0:mocap') - 
+        #                                     self.sim.data.get_site_xpos('object'))
+        # # print("dist2: ", dist_end_to_target)
+        # # print("gripperpalm: ", self.sim.data.get_site_xpos('gripperpalm'))
+        # # print("robot0:mocap: ", self.sim.data.get_mocap_pos('robot0:mocap'))
+        # # print("tar: ", self.sim.data.get_site_xpos('object'))
         dist_finger_1_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_1_polp_3') - 
-                                                 self.sim.data.get_site_xpos('tar'))
+                                                 self.sim.data.get_site_xpos('object'))
         dist_finger_2_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_2_polp_3') - 
-                                                 self.sim.data.get_site_xpos('tar'))
+                                                 self.sim.data.get_site_xpos('object'))
         dist_finger_middle_to_target = np.linalg.norm(self.sim.data.get_site_xpos('gripperfinger_middle_polp_3') - 
-                                                      self.sim.data.get_site_xpos('tar'))
+                                                      self.sim.data.get_site_xpos('object'))
 
-        reward_dist = tolerance(dist_end_to_target, margin=0.5, bounds=(0., 0.02),
-                                sigmoid='linear',
-                                value_at_margin=0.)
+        # reward_dist = tolerance(dist_end_to_target, margin=0.5, bounds=(0., 0.02),
+        #                         sigmoid='linear',
+        #                         value_at_margin=0.)
+        reward = -0.1 * np.linalg.norm(palm_pos - obj_pos)  # take hand to object
+        if (dist_finger_1_to_target < 0.05) or (dist_finger_2_to_target < 0.05) or (dist_finger_middle_to_target < 0.05): # if grap the object
+            reward += 1.0   # bonus for grap the object
+            reward += -0.5 * np.linalg.norm(palm_pos - target_pos) # make hand go to target
+            reward += -0.5 * np.linalg.norm(obj_pos - target_pos) # make object go to target
+        if np.linalg.norm(obj_pos-target_pos) < 0.1:
+            reward += 10.0  # bonus for object close to target
+        if np.linalg.norm(obj_pos-target_pos) < 0.05:
+            reward += 20.0  # bonus for object "very" close to target
+        reward += reward_ctrl
 
-        sparse_reward = 0.
-        if dist_end_to_target < 0.05:
-            sparse_reward += 1.
-            if (dist_finger_1_to_target < 0.05) or (dist_finger_2_to_target < 0.05) or (dist_finger_middle_to_target < 0.05):
-                sparse_reward += 2.
+
+        # sparse_reward = 0.
+        # if dist_end_to_target < 0.05:
+        #     sparse_reward += 1.
+        #     if (dist_finger_1_to_target < 0.05) or (dist_finger_2_to_target < 0.05) or (dist_finger_middle_to_target < 0.05):
+        #         sparse_reward += 2.
         
 
         # reward = 0.2 * reward_dist + reward_ctrl
@@ -206,10 +221,10 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         # print("dist_end_to_target: ", dist_end_to_target)
         # print("reward_dist: ", reward_dist)
         # print("sparse_reward: ", sparse_reward)
-        reward = reward_ctrl + dist_end_to_target * -0.5 + sparse_reward
+        # reward = reward_ctrl + dist_end_to_target * -0.5 + sparse_reward
 
         # done = False
-        # if self.sim.data.get_site_xpos('tar')[2] < 0.1: # z < 0.1
+        # if self.sim.data.get_site_xpos('object')[2] < 0.1: # z < 0.1
         #     done = True
         #     reward -1.
 
@@ -220,10 +235,38 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         
 
 
-        info = dict(scoring_reward=sparse_reward)
+        # info = dict(scoring_reward=sparse_reward)
 
         # return reward, done, info
         return reward
+    
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        # compute sparse rewards
+        self._check_success()
+        reward 
+
+        # add in shaped rewards
+        if self.reward_shaping:
+            staged_rewards = self.staged_rewards()
+            reward += max(staged_rewards)
+        returen reward
+    
+    def staged_rewards(self):
+        """
+        Returns staged rewawrds based on current physical states.
+        Stages consist of following, reaching, grasping, lifting, and hovering.
+        """
+
+        ### following reward 
+
+        ### reaching reward
+        reward_reach = 0.
+
+
+        ### grasping reward
+        touch
+
+        ### lifting reward
 
     # new reward compute function for catch env
     def compute_reward_catch(self, achieved_goal, goal, info):
@@ -239,12 +282,12 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
 
         reward = 0.25 * reward_dist
 
-        if self.sim.data.get_site_xpos('tar')[2] < 0.1: # if z < 0.1, then drop out and restart
+        if self.sim.data.get_site_xpos('object')[2] < 0.1: # if z < 0.1, then drop out and restart
             self._restart_target()
 
         sparse_reward = 0.
         dist = np.linalg.norm(self.sim.data.get_site_xpos('gripperpalm') -
-                              self.sim.data.get_site_xpos('tar'))
+                              self.sim.data.get_site_xpos('object'))
         if dist < 0.05:
             reward += 20.
             sparse_reward += 10.
@@ -286,23 +329,6 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         utils.ctrl_set_action(self.sim, action)
         utils.mocap_set_action(self.sim, action)
 
-    def _set_action_fetch(self, action):
-        assert action.shape == (4,)
-        action = action.copy()  # ensure that we don't change the action outside of this scope
-        pos_ctrl, gripper_ctrl = action[:3], action[3]
-
-        pos_ctrl *= 0.05  # limit maximum change in position
-        rot_ctrl = [1., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
-        gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
-        assert gripper_ctrl.shape == (2,)
-        if self.block_gripper:
-            gripper_ctrl = np.zeros_like(gripper_ctrl)
-        action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-
-        # Apply action to simulation.
-        utils.ctrl_set_action(self.sim, action)
-        utils.mocap_set_action(self.sim, action)
-
     def _get_obs(self):
         # positions
         # grip_pos - Position of the gripper given in 3 positional elements and 4 rotational elements
@@ -313,13 +339,13 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         robot_qpos, robot_qvel = utils.robot_get_obs(self.sim)
         if self.has_object:
             # object_pos - Position of the object with respect to the world frame
-            object_pos = self.sim.data.get_site_xpos('tar') 
+            object_pos = self.sim.data.get_site_xpos('object') 
             # rotations object_rot - Yes. That is the orientation of the object with respect to world frame.
-            object_rot = rotations.mat2euler(self.sim.data.get_site_xmat('tar'))
+            object_rot = rotations.mat2euler(self.sim.data.get_site_xmat('object'))
             # velocities object_velp - Positional velocity of the object with respect to the world frame
-            object_velp = self.sim.data.get_site_xvelp('tar') * dt
+            object_velp = self.sim.data.get_site_xvelp('object') * dt
             # object_velr - Rotational velocity of the object with respect to the world frame
-            object_velr = self.sim.data.get_site_xvelr('tar') * dt
+            object_velr = self.sim.data.get_site_xvelr('object') * dt
             # gripper state
             # object_rel_pos - Position of the object relative to the gripper
             object_rel_pos = object_pos - grip_pos
@@ -361,7 +387,7 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
     def _render_callback(self):
         # Visualize target.
         sites_offset = (self.sim.data.site_xpos - self.sim.model.site_pos).copy()
-        site_id = self.sim.model.site_name2id('tar')
+        site_id = self.sim.model.site_name2id('object')
         self.sim.model.site_pos[site_id] = self.goal - sites_offset[0]
         self.sim.forward()
 
@@ -374,10 +400,10 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
             object_xpos = self.initial_gripper_xpos[:2]
             while np.linalg.norm(object_xpos - self.initial_gripper_xpos[:2]) < 0.1:
                 object_xpos = self.initial_gripper_xpos[:2] + self.np_random.uniform(-self.obj_range, self.obj_range, size=2)
-            object_qpos = self.sim.data.get_joint_qpos('tar:joint')
+            object_qpos = self.sim.data.get_joint_qpos('object:joint')
             assert object_qpos.shape == (7,)
             object_qpos[:2] = object_xpos
-            self.sim.data.set_joint_qpos('tar:joint', object_qpos)
+            self.sim.data.set_joint_qpos('object:joint', object_qpos)
 
         self.sim.forward()
         return True
@@ -406,7 +432,7 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         # Move end effector into position.
         gripper_target = np.array([-0.498, 0.005, -0.431 + self.gripper_extra_height]) \
                          + self.sim.data.get_site_xpos('gripperpalm')
-        # gripper_target = [0.8, 0, 0.5]
+        # gripper_target = [-0.6, -0.5, 0.8]
         print("gripper_target:", gripper_target)
         print("currrent gripper position:", self.sim.data.get_site_xpos('gripperpalm'))
         gripper_rotation = np.array([0., 0., 1., 0.]) # fixed oritation to grasp
@@ -418,7 +444,7 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         # Extract information for sampling goals.
         self.initial_gripper_xpos = self.sim.data.get_site_xpos('gripperpalm').copy()
         if self.has_object:
-            self.height_offset = self.sim.data.get_site_xpos('tar')[2]
+            self.height_offset = self.sim.data.get_site_xpos('object')[2]
 
     def render(self, mode='human', width=500, height=500):
         return super(UR5KeepUpEnv, self).render(mode, width, height)

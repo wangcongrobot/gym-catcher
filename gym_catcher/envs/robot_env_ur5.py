@@ -25,17 +25,21 @@ class RobotEnv(gym.GoalEnv):
 
         model = mujoco_py.load_model_from_path(fullpath)
         self.sim = mujoco_py.MjSim(model, nsubsteps=n_substeps)
+        self.data = self.sim.data
         self.viewer = None
         self._viewers = {}
 
         self.metadata = {
-            'render.modes': ['human', 'rgb_array'],
+            'render.modes': ['human', 'rgb_array', 'depth_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
 
         self.seed()
         self._env_setup(initial_qpos=initial_qpos)
         self.initial_state = copy.deepcopy(self.sim.get_state())
+
+        self.init_qpos = self.sim.data.qpos.ravel().copy()
+        self.init_qvel = self.sim.data.qvel.ravel().copy()
 
         self.goal = self._sample_goal()
         obs = self._get_obs()
