@@ -1,11 +1,11 @@
 import gym
-import highway_env
+import gym_catcher
 import numpy as np
 
 from stable_baselines import HER, SAC, DDPG, TD3
 from stable_baselines.ddpg import NormalActionNoise
 
-env = gym.make("parking-v0")
+env = gym.make("UR5KeepUp-v0")
 
 # Create 4 artificial transitions per real transition
 n_sampled_goal = 4
@@ -33,10 +33,10 @@ model = HER('MlpPolicy', env, SAC, n_sampled_goal=n_sampled_goal,
 
 
 model.learn(int(2e5))
-model.save('her_sac_highway')
+model.save('ur5_keep_up_new_env')
 
 # Load saved model
-model = HER.load('her_sac_highway', env=env)
+model = HER.load('ur5_keep_up_new_env', env=env)
 
 obs = env.reset()
 

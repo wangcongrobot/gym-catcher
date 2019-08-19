@@ -1,5 +1,9 @@
 """
+
 train the ur5 keep up env using stable baselines her algorithm
+play the model
+run: python stable_her_play.py data/best_model.pkl
+
 """
 import gym
 import gym_catcher 
@@ -42,13 +46,13 @@ def plot_results(log_folder, title='Learning Curve'):
 env = gym.make('UR5KeepUp-v0')
 
 # Load saved model
-model = HER.load('sac', env=env)
+model = HER.load('./data/best_model', env=env)
 
 obs = env.reset()
 # env.render('human')
 # Evaluate the agent
 episode_reward = 0
-for _ in range(100):
+for _ in range(1000):
       action, _ = model.predict(obs)
       obs, reward, done, info = env.step(action)
       env.render()
@@ -57,4 +61,4 @@ for _ in range(100):
               print("Reward:", episode_reward, "Success?", info.get('is_success', False))
               episode_reward = 0.0
               obs = env.reset()
-# plot_results('/home/cong/workspace/DHER/gym-catcher/gym_catcher/algos/her/data/700')
+# plot_results('/home/cong/workspace/DHER/gym-catcher/gym_catcher/algos/her/data/')

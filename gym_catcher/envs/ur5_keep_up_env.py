@@ -5,8 +5,6 @@ import numpy as np
 from gym.envs.robotics import rotations, utils
 from gym_catcher.envs import robot_env_ur5
 
-from gym_catcher.utils.dm_utils.rewards import tolerance 
-
 def goal_distance(goal_a, goal_b):
     assert goal_a.shape == goal_b.shape
     # print("goal_a: ", goal_a)
@@ -59,8 +57,17 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
 
         self.action = None
         self.end_location = None
+
         # action dimentions
-        self.n_actions = 7
+        # the pos of end-effector: 3
+        # the quat of end-effector: 4
+        # the action of gripper: 1 (open/closed)
+        self.n_actions = 8 
+        
+        self.arm_dof = 6
+        self.gripper_dof = 1
+        self.dof = self.arm_dof + self.gripper_dof
+
         # calculate the time from one epoch starting
         # self.counts_from_start = 0
 
@@ -68,54 +75,10 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
             model_path=model_path, n_substeps=n_substeps, n_actions=self.n_actions,
             initial_qpos=initial_qpos)
 
-    # add new function for catch env
-    def _restart_target_catch(self):
-        target_x = self.np_random.uniform(low=0.52, high=0.84)
-        target_y = self.np_random.uniform(low=-0.23, high=0.23)
-
-        self.end_location = [2.2 - target_x, 0.75 + target_y, 0.66]
-
-        y = self.np_random.uniform(low=-0.5, high=0.5)
-        z = self.np_random.uniform(low=-0.15, high=0.)
-        z_offset = 0.34 + z
-        v_z = self.np_random.uniform(low=1.9, high=2.3)
-
-        del_y = y - target_y
-
-        target_dist = np.sqrt(del_y * del_y + target_x * target_x)
-
-        sin_theta = target_x / target_dist
-
-        v = target_dist * 9.81 / (v_z + np.sqrt(v_z * v_z + 19.62 * z_offset))
-
-        v_x = v * sin_theta
-        v_y = np.sign(del_y) * v * np.sqrt(1. - sin_theta * sin_theta)
-
-        self.sim.data.set_joint_qpos('tar:x', 0.0)
-        self.sim.data.set_joint_qpos('tar:y', y)
-        self.sim.data.set_joint_qpos('tar:z', z)
-        self.sim.data.set_joint_qvel('tar:x', - v_x)
-        self.sim.data.set_joint_qvel('tar:y', - v_y)
-        self.sim.data.set_joint_qvel('tar:z', v_z)
-
-
     # GoalEnv methods
     # ----------------------------
 
-    # Fetch env reward
-    def compute_reward1(self, achieved_goal, goal, info):
-        # Compute distance between goal and the achieved goal.
-        d = goal_distance(achieved_goal, goal)
-        # print("goal_distance:", d)
-        if self.reward_type == 'sparse':
-            # distance_threshold: 0.05
-            dist = -(d > self.distance_threshold).astype(np.float32)
-            # print("dist: ", dist.shape()) 
-            # print("(d > self.distance_threshold: ", (d > self.distance_threshold))
-            return -(d > self.distance_threshold).astype(np.float32)
-        else:
-            # print("-d: ", -d)
-            return -d
+
 
     def compute_reward_catch1(self, achieved_goal, desired_goal, info):
         '''
@@ -240,33 +203,175 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
         # return reward, done, info
         return reward
     
+        # Fetch env reward
+    
+    def compute_reward2(self, achieved_goal, goal, info):
+        # Compute distance between goal and the achieved goal.
+        d = goal_distance(achieved_goal, goal)
+        # print("goal_distance:", d)
+        if self.reward_type == 'sparse':
+            # distance_threshold: 0.05
+            dist = -(d > self.distance_threshold).astype(np.float32)
+            # print("dist: ", dist.shape()) 
+            # print("(d > self.distance_threshold: ", (d > self.distance_threshold))
+            return -(d > self.distance_threshold).astype(np.float32)
+        else:
+            # print("-d: ", -d)
+            return -d
+
     def compute_reward(self, achieved_goal, desired_goal, info):
         # compute sparse rewards
-        self._check_success()
-        reward 
+        # self._check_success()
+        # reward 
 
         # add in shaped rewards
-        if self.reward_shaping:
-            staged_rewards = self.staged_rewards()
-            reward += max(staged_rewards)
-        returen reward
+        # if self.reward_shaping:
+            # staged_rewards = self.staged_rewards()
+            # reward += max(staged_rewards)
+        staged_rewards = self.staged_rewards()
+        reward = np.sum(staged_rewards)
+        print("one step reward: ", reward)
+
+        done = False
+        if self.sim.data.get_site_xpos('object')[2] < 0.1:
+            done = True
+        return reward, done
     
+    def reward(self, action):
+        staged_rewards = self.staged_rewards()
+        return np.sum(staged_rewards)
+
     def staged_rewards(self):
         """
         Returns staged rewawrds based on current physical states.
         Stages consist of following, reaching, grasping, lifting, and hovering.
         """
+        # importance degree of four shaping reward
+        control_mult = -0.05
+        reach_mult = 0.1
+        grasp_mult = 0.35
+        lift_mult = 0.5
+        hover_mult = 0.7
 
-        ### following reward 
+        # control reward
+        # reward_ctrl = np.square(self.action).sum() * control_mult
+        reward_ctrl = 0.
+        print("reward_ctrl: ", reward_ctrl)
 
-        ### reaching reward
-        reward_reach = 0.
+        # following reward
+
+        # reaching reward
+        obj_pos = self.sim.data.get_site_xpos('object')
+        palm_pos = self.sim.data.get_mocap_pos('robot0:mocap')
+        target_pos = self.sim.data.get_site_xpos('target')
+        dist = np.linalg.norm(palm_pos - obj_pos)
+        # the larger distance, the fewer reward
+        # convert the dist to range (0, 1)
+        reward_reach = (1 - np.tanh(1.0 * dist)) * reach_mult
+        print("reward_reach: ", reward_reach)
+
+        # grasping reward
+        # int(False) = 0 int(True) = 1
+        reward_grasp = int(self._check_grasp()) * grasp_mult
+        print("reward_grasp: ", reward_grasp)
+
+        # lifting reward
+
+        return reward_ctrl, reward_reach, reward_grasp
 
 
-        ### grasping reward
-        touch
+    def _check_grasp(self):
+        """
+        Return True if the gripper has grasped the object.
+        Using the contact detection between gripper and object.
+        First, palm contact must be true.
+        Second, three (or two) fingers contact with the object can return True.
+        """
+        # get the contact geom information from ur5_keep_up.xml file
+        finger_1_geom_names = ["f1_l0", "f1_l1", "f1_l2", "f1_l3"]
+        finger_2_geom_names = ["f2_l0", "f2_l1", "f2_l2", "f2_l3"]
+        finger_3_geom_names = ["f3_l0", "f3_l1", "f3_l2", "f3_l3"]
+        palm_geom_name = "gripperpalm"
+        object_geom_name = "object"
 
-        ### lifting reward
+        # get the geom ids from the names
+        finger_1_geom_ids = [
+            self.sim.model.geom_name2id(x) for x in finger_1_geom_names
+        ]
+        finger_2_geom_ids = [
+            self.sim.model.geom_name2id(x) for x in finger_2_geom_names
+        ]
+        finger_3_geom_ids = [
+            self.sim.model.geom_name2id(x) for x in finger_3_geom_names
+        ]
+        palm_geom_id = self.sim.model.geom_name2id(palm_geom_name)
+        object_geom_id = self.sim.model.geom_name2id(object_geom_name)
+
+        # touch/contact detection flag
+        touch_finger_1 = False
+        touch_finger_2 = False
+        touch_finger_3 = False
+        touch_palm = False
+        has_grasp = False
+
+        # int ncon: number of detected contacts
+        for i in range(self.sim.data.ncon):
+            # list of all detected contacts
+            contact = self.sim.data.contact[i]
+            # if the object is in the detected contact geom1
+            if contact.geom1 == object_geom_id:
+                # wether the finger 1 in the detected contacts
+                if contact.geom2 in finger_1_geom_ids:
+                    # result: finger 1 touched the object
+                    touch_finger_1 = True
+                if contact.geom2 in finger_2_geom_ids:
+                    # finger 2 touched the object
+                    touch_finger_2 = True
+                if contact.geom2 in finger_3_geom_ids:
+                    # finger 3 touched the object
+                    touch_finger_3 = True
+                if contact.geom2 == palm_geom_id:
+                    # palm touched the object
+                    touch_palm = True
+            # if the object is in the detected contact geom2
+            elif contact.geom2 == object_geom_id:
+                if contact.geom1 in finger_1_geom_ids:
+                    # finger 1 touched the object
+                    touch_finger_1 = True
+                if contact.geom1 in finger_2_geom_ids:
+                    # finger 2 touched the object
+                    touch_finger_2 = True
+                if contact.geom1 in finger_3_geom_ids:
+                    # finger 3 touched the object
+                    touch_finger_3 = True
+                if contact.geom1 == palm_geom_id:
+                    # palm touched the object
+                    touch_palm = True
+
+        # TODO: two finger may also has grasp
+        # the palm touch must be true first
+        if touch_palm:
+            # has three finger touch must be true
+            if touch_finger_1 and touch_finger_2 and touch_finger_3:
+                has_grasp = True
+            # has two finger touch maybe true
+            elif touch_finger_1 and touch_finger_3:
+                has_grasp = True
+            # has two finger touch maybe true
+            elif touch_finger_2 and touch_finger_3:
+                has_grasp = True
+        if has_grasp:
+            print("Get a successful grasp!")
+
+        return has_grasp
+
+
+    def _check_success(self):
+        """
+        Return True if task has been completed.
+        """
+        return self._check_grasp()
+
 
     # new reward compute function for catch env
     def compute_reward_catch(self, achieved_goal, goal, info):
@@ -310,24 +415,7 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
             # self.counts_from_start += 1
             # print("counts_from_start: ", self.counts_from_start)
 
-    def _set_action(self, action):
-        # print("_set_action:", action)
-        assert action.shape == (self.n_actions,)
-        self.action = action
-        action = action.copy()  # ensure that we don't change the action outside of this scope
-        pos_ctrl, gripper_ctrl = action[:3], action[3:]
 
-        pos_ctrl *= 0.05  # limit maximum change in position
-        rot_ctrl = [0., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
-        # gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
-        # assert gripper_ctrl.shape == (2,)
-        if self.block_gripper:
-            gripper_ctrl = np.zeros_like(gripper_ctrl)
-        action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
-
-        # Apply action to simulation.
-        utils.ctrl_set_action(self.sim, action)
-        utils.mocap_set_action(self.sim, action)
 
     def _get_obs(self):
         # positions
@@ -448,3 +536,86 @@ class UR5KeepUpEnv(robot_env_ur5.RobotEnv):
 
     def render(self, mode='human', width=500, height=500):
         return super(UR5KeepUpEnv, self).render(mode, width, height)
+
+    # end-effector control
+    def _set_action_pose(self, action):
+        # print("_set_action:", action)
+        assert action.shape == (self.n_actions,)
+        self.action = action
+        action = action.copy()  # ensure that we don't change the action outside of this scope
+        pos_ctrl, gripper_ctrl = action[:3], action[3:]
+
+        pos_ctrl *= 0.05  # limit maximum change in position
+        rot_ctrl = [0., 0., 1., 0.]  # fixed rotation of the end effector, expressed as a quaternion
+        # gripper_ctrl = np.array([gripper_ctrl, gripper_ctrl])
+        # assert gripper_ctrl.shape == (2,)
+        if self.block_gripper:
+            gripper_ctrl = np.zeros_like(gripper_ctrl)
+        action = np.concatenate([pos_ctrl, rot_ctrl, gripper_ctrl])
+
+        # Apply action to simulation.
+        utils.ctrl_set_action(self.sim, action)
+        utils.mocap_set_action(self.sim, action)
+    
+    # joint control
+    def _set_action(self, action):
+        self._pre_action(action)
+
+    def _pre_action(self, action):
+        """
+
+        Args:
+            action (numpy array): The control to apply to the robot. The first
+                @self.mujoco_robot.dof dimensions should be the desired normalized joint velocities and if the robot has a gripper, the next @self.gripper.dof dimensions should be actuation controls for the gripper.
+        """
+
+        # clip actions into valid range
+        # 6 arm joint dof plus 1 gripper joint dof
+        assert len(action) == self.dof, "environment got invalid action dimension"
+        low, high = self.action_spec
+        action = np.clip(action, low, high)
+
+        # another control mode: end-effector pose
+        arm_action = action[: self.arm_dof]
+        # 1 dof to control the grippper: 1 => open, -1 => closed
+        gripper_action_in = action[self.arm_dof : self.arm_dof + self.gripper_dof]
+        # 11 dof of the actual gripper
+        gripper_action_actual = self.gripper_format_action(gripper_action_in)
+        # 17 = 6 + 11
+        action = np.concatenate([arm_action, gripper_action_actual])
+        print("action: ", action)
+
+        # rescale normalized action to control ranges
+        ctrl_range = self.sim.model.actuator_ctrlrange
+        bias = 0.5 * (ctrl_range[:, 1] + ctrl_range[:, 0])
+        weight = 0.5 * (ctrl_range[:, 1] - ctrl_range[:, 0])
+        applied_action = bias + weight * action
+        print("applied_action: ", applied_action)
+        self.sim.data.ctrl[:] = applied_action
+
+    def _post_action(self, action):
+
+        pass
+
+
+    # self.action_space = spaces.Box(-1., 1., shape=(n_actions,), dtype='float32'
+    @property
+    def action_spec(self):
+        """
+        Action lower/upper limits per dimension.
+        """
+        low = np.ones(self.dof) * -1.
+        high = np.ones(self.dof) * 1.
+        print(low)
+        print(high)
+        return low, high
+
+    def gripper_format_action(self, action):
+        """ Given (-1,1) abstract control as np-array return the (-1,1) control signals
+        for underlying actuators as 1-d np array
+        Args:
+            action: 1 => open, -1 => closed
+        """
+        movement = np.array([0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1])
+        return -1 * movement * action
+

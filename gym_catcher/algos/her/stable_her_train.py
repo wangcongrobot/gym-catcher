@@ -19,14 +19,15 @@ from stable_baselines.her.utils import HERGoalEnvWrapper
 from stable_baselines.logger import configure 
 from stable_baselines.results_plotter import load_results, ts2xy
 
-# openai baselines monitor using file tb/ to record, tensorboard
-configure()
 
-logdir = '/home/cong/workspace/DHER/gym-catcher/gym_catcher/algos/her/data/'
+tb_logdir = '/home/cong/workspace/DHER/gym-catcher/gym_catcher/algos/her/data/'
+
+# openai baselines monitor using file tb/ to record, tensorboard
+configure(folder=tb_logdir)
 
 ENV = "UR5KeepUp-v0"
-ALGO = 'sac'
-NB_TRAIN_EPS = 100000 # corresponding to one HER baseline run for Fetch env
+ALGO = 'ddpg'
+NB_TRAIN_EPS = 1000 # corresponding to one HER baseline run for Fetch env
 EP_TIMESTEPS = 50
 LOG_INTERVAL = 100 # every 2000 episodes
 
@@ -117,7 +118,7 @@ def plot_results(log_folder, title='Learning Curve'):
 
 def launch(algo, env_id, trial_id, seed):
 
-    # logdir = find_save_path('./data/' + env_id + "/", trial_id)
+    logdir = find_save_path('./data/' + env_id + "/", trial_id)
     # logdir = '/tmp/her/'
 
     algo_ = ALGOS[algo]
@@ -149,15 +150,16 @@ def launch(algo, env_id, trial_id, seed):
 
     model = HER('MlpPolicy', env, algo_, n_sampled_goal=n_sampled_goal, 
                 goal_selection_strategy='future',
-                verbose=1, buffer_size=int(1e6), 
+                verbose=1, buffer_size=int(1e3), 
                 # nb_train_steps=100, 
                 # eval_env=eval_env, 
                 # nb_eval_steps=20*EP_TIMESTEPS,
                 gamma=0.95, batch_size=256,
-                tensorboard_log="./log_stable_her/",
+                # tensorboard_log="./log_stable_her/",
                 policy_kwargs=dict(layers=[256, 256, 256]), **kwargs)
 
-    model.learn(total_timesteps=NB_TRAIN_EPS * EP_TIMESTEPS, log_interval=LOG_INTERVAL, callback=callback)
+    # model.learn(total_timesteps=NB_TRAIN_EPS * EP_TIMESTEPS, log_interval=LOG_INTERVAL, callback=callback)
+    model.learn(total_timesteps=NB_TRAIN_EPS * EP_TIMESTEPS, log_interval=LOG_INTERVAL)
     model.save(os.path.join(logdir, algo))
 
     plot_results(logdir)

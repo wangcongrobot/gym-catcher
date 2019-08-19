@@ -1,4 +1,7 @@
 # change the env form original gym robot env
+# using for ur5 env
+# gym.Env
+
 import os
 import copy
 import numpy as np
@@ -45,7 +48,7 @@ class RobotEnv(gym.GoalEnv):
         obs = self._get_obs()
         self.action_space = spaces.Box(-1., 1., shape=(n_actions,), dtype='float32')
         self.observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['desired_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
             observation=spaces.Box(-np.inf, np.inf, shape=obs['observation'].shape, dtype='float32'),
         ))
@@ -57,6 +60,7 @@ class RobotEnv(gym.GoalEnv):
     def dt(self):
         return self.sim.model.opt.timestep * self.sim.nsubsteps
 
+
     # Env methods
     # ----------------------------
 
@@ -65,8 +69,14 @@ class RobotEnv(gym.GoalEnv):
         return [seed]
 
     def step(self, action):
-        action = np.clip(action, self.action_space.low, self.action_space.high)
-        self._set_action(action)
+        """ Takes a step in simulation with control command @action."""
+        # for time steps limit
+        # if self.done:
+            # raise ValueError("executing action in terminated episode")
+
+        # action = np.clip(action, self.action_space.low, self.action_space.high)
+        self._pre_action(action)
+        # self._set_action(action)
         self.sim.step()
         self._step_callback()
         obs = self._get_obs()
@@ -76,10 +86,16 @@ class RobotEnv(gym.GoalEnv):
 
         done = False
         info = {
-            'is_success': self._is_success(obs['achieved_goal'], self.goal),
+            # 'is_success': self._is_success(obs['achieved_goal'], self.goal),
+            'is_success': self._check_success(),
         }
-        reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
+        reward, done = self.compute_reward(obs['achieved_goal'], self.goal, info)
+        # reward = self.reward(action)
         return obs, reward, done, info
+
+    def reward(self, action):
+        """ Reward should be a function of state and action."""
+        return 0
 
     def reset(self):
         # Attempt to reset the simulator. Since we randomize initial conditions, it
@@ -154,6 +170,12 @@ class RobotEnv(gym.GoalEnv):
         """
         raise NotImplementedError()
 
+    def _check_success(self):
+        """
+        Return True if task has been completed.
+        """
+        return False
+
     def _sample_goal(self):
         """Samples a new goal and returns it.
         """
@@ -182,3 +204,29 @@ class RobotEnv(gym.GoalEnv):
         to enforce additional constraints on the simulation state.
         """
         pass
+
+    def _pre_action(self, action):
+        """ Do any preprocessing before taking an action."""
+        self.sim.data.ctrl[:] = action
+
+    def _post_action(self, action):
+        """ Do any housekeeping after taking an action."""
+        reward = self.reward(action)
+
+    def action_spec(self):
+        """
+        Action specification should be implemented in subclasses.
+
+        Action space is represented by a tuple of (low, high), which are numpy
+        vectors that specify the min/max action limits per dimension.
+        """
+        raise NotImplementedError
+
+
+    def gripper_format_action(self, action):
+        """
+        Given (-1,1) abstrct control as np-array
+        returns the (-1,1) control signals
+        for underlying actuators as 1-d np array
+        """
+        raise NotImplementedError

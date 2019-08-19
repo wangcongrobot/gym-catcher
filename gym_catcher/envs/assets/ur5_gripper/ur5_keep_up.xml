@@ -97,6 +97,7 @@ Control Engineering / Automation Engineering
     </asset>
 
     <equality>
+    <!-- contrl the end-effector using mocap body, cartesion control -->
         <weld body1="robot0:mocap" body2="gripperpalm" solimp="0.9 0.95 0.001" solref="0.02 1"></weld>
     </equality>
 
@@ -385,12 +386,12 @@ Control Engineering / Automation Engineering
     <actuator>
         <!--UR5-->
         <!-- position control mode -->
-        <!-- <position name='shoulder_pan' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='shoulder_pan_joint' kp="500"/> -->
-        <!-- <position name='shoulder_lift' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='shoulder_lift_joint' kp="500"/> -->
-        <!-- <position name='forearm' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='elbow_joint' kp="500"/> -->
-        <!-- <position name='wrist_1' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='wrist_1_joint' kp="100"/> -->
-        <!-- <position name='wrist_2' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='wrist_2_joint' kp="100"/> -->
-        <!-- <position name='wrist_3' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='wrist_3_joint' kp="100"/> -->
+        <position name='shoulder_pan' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='shoulder_pan_joint' kp="500"/>
+        <position name='shoulder_lift' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='shoulder_lift_joint' kp="500"/>
+        <position name='forearm' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='elbow_joint' kp="500"/>
+        <position name='wrist_1' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='wrist_1_joint' kp="100"/>
+        <position name='wrist_2' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='wrist_2_joint' kp="100"/>
+        <position name='wrist_3' ctrllimited="true" ctrlrange="-3.14159 3.14159" joint='wrist_3_joint' kp="100"/>
 
         <!-- force control mode -->
         <!-- <motor name='shoulder_pan_T' ctrllimited="true" ctrlrange="-2 2" joint='shoulder_pan_joint' gear="101"/> range -150 150 -->

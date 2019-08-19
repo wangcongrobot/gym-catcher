@@ -1,0 +1,1 @@
+Logging to /home/cong/workspace/DHER/gym-catcher/gym_catcher/algos/her/data/

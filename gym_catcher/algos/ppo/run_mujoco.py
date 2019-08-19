@@ -37,7 +37,8 @@ def train(env_id, num_timesteps, seed):
 def main():
     args = mujoco_arg_parser().parse_args()
     logger.configure()
-    train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
+    # train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
+    train('UR5KeepUp-v0', num_timesteps=1000, seed=0)
 
 
 if __name__ == '__main__':
